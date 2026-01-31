@@ -8,12 +8,17 @@ import { UserPlus } from 'lucide-react'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Generate random Pilot ID
+  const generatePilotId = () => {
+    const randomNum = Math.floor(1000 + Math.random() * 9000)
+    return `Pilot-${randomNum}`
+  }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,35 +35,41 @@ export default function RegisterPage() {
       return
     }
 
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters')
-      return
-    }
-
     setLoading(true)
 
     try {
       const supabase = createClient()
       
+      // Generate auto username
+      const autoUsername = generatePilotId()
+      
       // Sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username: autoUsername,
+          }
+        }
       })
 
       if (authError) throw authError
 
       if (authData.user) {
-        // Create user profile in public.users table
-        const { error: profileError } = await supabase
+        // Wait a bit for the trigger to complete (creates user + wallet automatically)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
+        // Update the username in the users table
+        const { error: updateError } = await supabase
           .from('users')
-          .insert({
-            id: authData.user.id,
-            username,
-            email,
-          })
+          .update({ username: autoUsername })
+          .eq('id', authData.user.id)
 
-        if (profileError) throw profileError
+        if (updateError) {
+          console.error('Failed to update username:', updateError)
+          // Don't throw - user is created, just username might be default
+        }
 
         // Generate starter planet
         const { error: planetError } = await supabase
@@ -91,32 +102,24 @@ export default function RegisterPage() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             ENERGY EMPIRE
           </h1>
-          <p className="text-gray-400 mt-2">Create your account</p>
+          <p className="text-gray-400 mt-2">Join the YieldVerse</p>
         </div>
 
         {/* Register Form */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 p-8">
           <form onSubmit={handleRegister} className="space-y-6">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-gray-300">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="EnergyMaster123"
-                required
-                minLength={3}
-              />
+            
+            {/* Pilot ID Info */}
+            <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
+              <p className="text-blue-300 text-sm text-center">
+                🚀 Your Pilot ID will be assigned automatically
+              </p>
             </div>
 
             {/* Email */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-300">
-                Email
+                Email (FaucetPay)
               </label>
               <input
                 type="email"
@@ -126,6 +129,7 @@ export default function RegisterPage() {
                 placeholder="you@example.com"
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">Use your FaucetPay email for future payouts</p>
             </div>
 
             {/* Password */}
