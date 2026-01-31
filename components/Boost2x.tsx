@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Zap, X } from 'lucide-react'
+import { Zap, X, Clock } from 'lucide-react'
 import { useGameStore } from '@/lib/store/gameStore'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,7 +10,13 @@ export default function Boost2x() {
   const [isActive, setIsActive] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [showModal, setShowModal] = useState(false)
+  const [showAdModal, setShowAdModal] = useState(false)
+  const [adCountdown, setAdCountdown] = useState(30)
   const [loading, setLoading] = useState(false)
+
+  // Ad URL - Your PropellerAds link
+  const AD_URL = 'https://otieu.com/4/10508571'
+  const AD_REQUIRED_TIME = 30 // seconds
 
   // Check if boost is active on mount
   useEffect(() => {
@@ -27,7 +33,7 @@ export default function Boost2x() {
     }
   }, [])
 
-  // Countdown timer
+  // Boost countdown timer
   useEffect(() => {
     if (!isActive || timeRemaining <= 0) return
 
@@ -44,6 +50,24 @@ export default function Boost2x() {
 
     return () => clearInterval(interval)
   }, [isActive, timeRemaining])
+
+  // Ad countdown timer
+  useEffect(() => {
+    if (!showAdModal) return
+
+    setAdCountdown(AD_REQUIRED_TIME)
+
+    const interval = setInterval(() => {
+      setAdCountdown((prev) => {
+        if (prev <= 1) {
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [showAdModal])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -85,17 +109,19 @@ export default function Boost2x() {
     }
   }
 
-  const activateBoostWithAd = () => {
-    // In production, integrate with ad network (PropellerAds, etc)
-    // For now, simulate watching an ad
-    alert('🎬 Ad integration coming soon! For now, getting free boost...')
-    
+  const openAdModal = () => {
+    setShowModal(false)
+    setShowAdModal(true)
+  }
+
+  const closeAdAndActivateBoost = () => {
+    // Activate boost for 5 minutes
     const expiresAt = Date.now() + 5 * 60 * 1000
     localStorage.setItem('boost2x', JSON.stringify({ expiresAt }))
     
     setIsActive(true)
     setTimeRemaining(300)
-    setShowModal(false)
+    setShowAdModal(false)
   }
 
   if (isActive) {
@@ -132,6 +158,7 @@ export default function Boost2x() {
         Activate 2x Boost
       </button>
 
+      {/* Choice Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-gray-800 rounded-lg border border-gray-700 max-w-md w-full p-6">
@@ -161,11 +188,11 @@ export default function Boost2x() {
 
             <div className="space-y-3">
               <button
-                onClick={activateBoostWithAd}
+                onClick={openAdModal}
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all"
               >
-                📺 Watch Ad (Free)
+                📺 Watch Ad (Free - 30s)
               </button>
 
               <button
@@ -173,7 +200,7 @@ export default function Boost2x() {
                 disabled={loading || wallet.fuel < 5}
                 className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all"
               >
-                🔥 Pay 5 Fuel
+                🔥 Pay 5 Fuel (Skip Ad)
                 {wallet.fuel < 5 && (
                   <span className="block text-xs mt-1">
                     (Need {5 - wallet.fuel} more Fuel)
@@ -185,6 +212,65 @@ export default function Boost2x() {
             <p className="text-xs text-gray-500 text-center mt-4">
               💡 Tip: Use boost when actively clicking!
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Ad Modal with Iframe */}
+      {showAdModal && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg border-2 border-yellow-500 max-w-4xl w-full h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="bg-yellow-500 p-2 rounded-lg animate-pulse">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-yellow-400">Earning Your 2x Boost...</h3>
+                  <p className="text-xs text-gray-400">Please wait {adCountdown}s</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-gray-900 px-3 py-2 rounded-lg">
+                <Clock className="w-4 h-4 text-yellow-400" />
+                <span className="font-mono text-yellow-400 font-bold">{adCountdown}s</span>
+              </div>
+            </div>
+
+            {/* Iframe Container */}
+            <div className="flex-1 relative overflow-hidden">
+              <iframe
+                src={AD_URL}
+                className="w-full h-full border-0"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                title="Advertisement"
+              />
+            </div>
+
+            {/* Footer with Close Button */}
+            <div className="p-4 border-t border-gray-700">
+              {adCountdown > 0 ? (
+                <div className="bg-gray-900 rounded-lg p-4 text-center">
+                  <p className="text-gray-400 text-sm mb-2">
+                    ⏳ Please watch the ad for {adCountdown} more seconds...
+                  </p>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-yellow-500 to-orange-500 h-2 rounded-full transition-all duration-1000"
+                      style={{ width: `${((AD_REQUIRED_TIME - adCountdown) / AD_REQUIRED_TIME) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={closeAdAndActivateBoost}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-lg transition-all flex items-center justify-center gap-2 animate-pulse"
+                >
+                  <Zap className="w-6 h-6" />
+                  Close & Activate 2x Boost!
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
